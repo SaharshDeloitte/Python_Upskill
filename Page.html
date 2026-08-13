@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI Data Viewer</title>
+    <style>
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            margin: 24px;
+            background: #f5f7fb;
+            color: #1f2937;
+        }
+
+        h2 {
+            margin-bottom: 8px;
+        }
+
+        .section {
+            background: #ffffff;
+            border: 1px solid #dbe3ee;
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 14px;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        button {
+            border: none;
+            padding: 10px 14px;
+            border-radius: 8px;
+            background: #2563eb;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        input {
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            width: 120px;
+        }
+
+        pre {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 14px;
+            border-radius: 10px;
+            min-height: 120px;
+            overflow-x: auto;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <h2>FastAPI Demo</h2>
+
+    <section class="section">
+        <h3>Items</h3>
+        <div class="controls">
+            <button id="btnRoot" type="button">GET /</button>
+            <button id="btnItems" type="button">GET /items</button>
+            <input id="itemId" type="number" min="1" placeholder="Item ID">
+            <button id="btnItemById" type="button">GET /items/:id</button>
+        </div>
+        <pre id="itemsOutput">—</pre>
+    </section>
+
+    <section class="section">
+        <h3>Joke API</h3>
+        <div class="controls">
+            <button id="btnJoke" type="button">GET /joke</button>
+        </div>
+        <pre id="jokeOutput">—</pre>
+    </section>
+
+    <section class="section">
+        <h3>Weather API</h3>
+        <div class="controls">
+            <input id="city" type="text" placeholder="Enter City">
+            <button id="btnWeather" type="button">GET /weather</button>
+        </div>
+        <pre id="weatherOutput">—</pre>
+    </section>
+
+    <script>
+        const API_BASE_URL = "http://127.0.0.1:8000";
+        const itemsOutput = document.getElementById("itemsOutput");
+        const jokeOutput = document.getElementById("jokeOutput");
+        const weatherOutput = document.getElementById("weatherOutput");
+        const itemIdInput = document.getElementById("itemId");
+        const cityInput = document.getElementById("city");
+
+        async function callApi(endpoint, targetOutput) {
+            targetOutput.textContent = "Loading...";
+
+            try {
+                const response = await fetch(`${API_BASE_URL}${endpoint}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    targetOutput.textContent = `Error ${response.status}: ${JSON.stringify(data, null, 2)}`;
+                    return;
+                }
+
+                targetOutput.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                targetOutput.textContent = `Request failed: ${error.message}`;
+            }
+        }
+
+        document.getElementById("btnRoot").addEventListener("click", () => callApi("/", itemsOutput));
+        document.getElementById("btnItems").addEventListener("click", () => callApi("/items", itemsOutput));
+
+        document.getElementById("btnItemById").addEventListener("click", () => {
+            const itemId = itemIdInput.value.trim();
+
+            if (!itemId) {
+                itemsOutput.textContent = "Please enter an Item ID first.";
+                return;
+            }
+
+            callApi(`/items/${itemId}`, itemsOutput);
+        });
+
+        document.getElementById("btnJoke").addEventListener("click", () => {
+            callApi("/joke", jokeOutput);
+        });
+
+        document.getElementById("btnWeather").addEventListener("click", () => {
+            const city = cityInput.value.trim();
+
+            if (!city) {
+                weatherOutput.textContent = "Please enter city first.";
+                return;
+            }
+
+            callApi(`/weather?city=${encodeURIComponent(city)}`, weatherOutput);
+        });
+    </script>
+</body>
+</html>
