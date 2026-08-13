@@ -52,6 +52,17 @@
             width: 120px;
         }
 
+        textarea {
+            width: 100%;
+            min-height: 110px;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-family: inherit;
+            margin-bottom: 12px;
+            resize: vertical;
+        }
+
         pre {
             background: #0f172a;
             color: #e2e8f0;
@@ -94,13 +105,24 @@
         <pre id="weatherOutput">—</pre>
     </section>
 
+    <section class="section">
+        <h3>Summary API</h3>
+        <textarea id="summaryText" placeholder="Paste text to summarize..."></textarea>
+        <div class="controls">
+            <button id="btnSummary" type="button">POST /summary</button>
+        </div>
+        <pre id="summaryOutput">—</pre>
+    </section>
+
     <script>
         const API_BASE_URL = "http://127.0.0.1:8000";
         const itemsOutput = document.getElementById("itemsOutput");
         const jokeOutput = document.getElementById("jokeOutput");
         const weatherOutput = document.getElementById("weatherOutput");
+        const summaryOutput = document.getElementById("summaryOutput");
         const itemIdInput = document.getElementById("itemId");
         const cityInput = document.getElementById("city");
+        const summaryTextInput = document.getElementById("summaryText");
 
         async function callApi(endpoint, targetOutput) {
             targetOutput.textContent = "Loading...";
@@ -117,6 +139,37 @@
                 targetOutput.textContent = JSON.stringify(data, null, 2);
             } catch (error) {
                 targetOutput.textContent = `Request failed: ${error.message}`;
+            }
+        }
+
+        async function callSummaryApi() {
+            const text = summaryTextInput.value.trim();
+
+            if (!text) {
+                summaryOutput.textContent = "Please enter text first.";
+                return;
+            }
+
+            summaryOutput.textContent = "Loading...";
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/summary`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ text }),
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    summaryOutput.textContent = `Error ${response.status}: ${JSON.stringify(data, null, 2)}`;
+                    return;
+                }
+
+                summaryOutput.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                summaryOutput.textContent = `Request failed: ${error.message}`;
             }
         }
 
@@ -147,6 +200,10 @@
             }
 
             callApi(`/weather?city=${encodeURIComponent(city)}`, weatherOutput);
+        });
+
+        document.getElementById("btnSummary").addEventListener("click", () => {
+            callSummaryApi();
         });
     </script>
 </body>

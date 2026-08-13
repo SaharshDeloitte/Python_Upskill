@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from enum import Enum
 import requests
 
-from config import JOKE_API_URL, WEATHER_API_URL, WEATHER_API_KEY
+from config import JOKE_API_URL, WEATHER_API_URL, WEATHER_API_KEY, OPENAI_API_KEY, OPENAI_MODEL
 
 
 app = FastAPI()
@@ -30,6 +30,10 @@ class Item(BaseModel):
     price: float
     category: Category
     count: int
+
+
+class SummaryRequest(BaseModel):
+    text: str
 
 
 items = {
@@ -92,3 +96,59 @@ async def get_weather(city: str):
             raise HTTPException(status_code=502, detail="Could not fetch weather")
     except requests.RequestException:
         raise HTTPException(status_code=502, detail="Could not fetch weather")
+
+
+@app.post("/summary")
+async def summarize_text(payload: SummaryRequest):
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+
+    prompt_text = (
+        "Create a short and clear summary for a beginner.\n"
+        "Keep it short (about 2-3 sentences).\n"
+        "Keep simple words and keep the main meaning.\n"
+        "Do not use bullet points. Return plain text only.\n\n"
+        f"Text:\n{text}\n\n"
+        "Summary:"
+    )
+
+    request_body = {
+        "model": OPENAI_MODEL,
+        "messages": [
+            {"role": "system", "content": "You write short, clear summaries."},
+            {"role": "user", "content": prompt_text},
+        ],
+        "temperature": 0.2,
+    }
+
+    request_headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        res = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=request_headers,
+            json=request_body,
+            timeout=20,
+        )
+
+        if res.status_code == 200:
+            data = res.json()
+            summary_text = data["choices"][0]["message"]["content"].strip()
+            return {
+                "summary": summary_text,
+                "model": OPENAI_MODEL,
+            }
+        elif res.status_code == 400:
+            raise HTTPException(status_code=400, detail="Invalid summary request")
+        else:
+            raise HTTPException(status_code=502, detail="Could not fetch summary")
+
+    except requests.RequestException:
+        raise HTTPException(status_code=502, detail="Could not fetch summary")
