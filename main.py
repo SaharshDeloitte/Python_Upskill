@@ -4,7 +4,14 @@ from pydantic import BaseModel
 from enum import Enum
 import requests
 
-from config import JOKE_API_URL, WEATHER_API_URL, WEATHER_API_KEY, OPENAI_API_KEY, OPENAI_MODEL
+from config import (
+    JOKE_API_URL,
+    WEATHER_API_URL,
+    WEATHER_API_KEY,
+    ANTHROPIC_API_URL,
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL,
+)
 
 
 app = FastAPI()
@@ -66,10 +73,6 @@ async def get_joke():
         res = requests.get(JOKE_API_URL, timeout=10)
         if res.status_code == 200:
             return res.json()
-        elif res.status_code == 404:
-            raise HTTPException(status_code=404, detail="Joke not found")
-        else:
-            raise HTTPException(status_code=502, detail="Could not fetch joke")
     except requests.RequestException:
         raise HTTPException(status_code=502, detail="Could not fetch joke")
 
@@ -100,12 +103,12 @@ async def get_weather(city: str):
 
 @app.post("/summary")
 async def summarize_text(payload: SummaryRequest):
-    if not OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
-
     text = payload.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="Text is required")
+
+    if not ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=500, detail="Anthropic API key not configured")
 
     prompt_text = (
         "Create a short and clear summary for a beginner.\n"
@@ -117,22 +120,22 @@ async def summarize_text(payload: SummaryRequest):
     )
 
     request_body = {
-        "model": OPENAI_MODEL,
+        "model": ANTHROPIC_MODEL,
+        "max_tokens": 250,
         "messages": [
-            {"role": "system", "content": "You write short, clear summaries."},
             {"role": "user", "content": prompt_text},
         ],
-        "temperature": 0.2,
     }
 
     request_headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
     }
 
     try:
         res = requests.post(
-            "https://api.openai.com/v1/chat/completions",
+            ANTHROPIC_API_URL,
             headers=request_headers,
             json=request_body,
             timeout=20,
@@ -140,15 +143,22 @@ async def summarize_text(payload: SummaryRequest):
 
         if res.status_code == 200:
             data = res.json()
-            summary_text = data["choices"][0]["message"]["content"].strip()
+            text_blocks = data.get("content", [])
+            summary_parts = [
+                block.get("text", "").strip()
+                for block in text_blocks
+                if isinstance(block, dict) and block.get("type") == "text"
+            ]
+            summary_text = "\n".join(part for part in summary_parts if part)
+            if not summary_text:
+                raise HTTPException(status_code=502, detail="Empty summary returned by Anthropic")
             return {
                 "summary": summary_text,
-                "model": OPENAI_MODEL,
+                "model": ANTHROPIC_MODEL,
+                "source": "anthropic",
             }
-        elif res.status_code == 400:
+        if res.status_code == 400:
             raise HTTPException(status_code=400, detail="Invalid summary request")
-        else:
-            raise HTTPException(status_code=502, detail="Could not fetch summary")
 
     except requests.RequestException:
         raise HTTPException(status_code=502, detail="Could not fetch summary")
